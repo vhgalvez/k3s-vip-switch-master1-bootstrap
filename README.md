@@ -6,7 +6,7 @@ Este proyecto de Ansible automatiza el proceso de reconfiguración del primer no
 
 ## 📁 Estructura del proyecto
 
-```
+```plaintext
 k3s-vip-switch-master1-bootstrap/
 ├── inventory/
 │   └── hosts.ini # Definición del nodo master1 y la IP VIP
