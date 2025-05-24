@@ -1,0 +1,51 @@
+# playbooks\switch-to-vip.yml
+- name: Cambiar configuración de master1 para usar la VIP como servidor K3s
+  hosts: master1
+  become: true
+  gather_facts: false
+
+  vars:
+    vip_ip: "10.17.5.10"
+    k3s_token: "{{ hostvars[groups['masters'][0]]['k3s_token_output']['stdout'] | trim }}"
+
+  tasks:
+    - name: Detener K3s en master1
+      ansible.builtin.systemd:
+        name: k3s
+        state: stopped
+
+    - name: Reconfigurar systemd unit para K3s con VIP
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/k3s.service
+        content: |
+          [Unit]
+          Description=Lightweight Kubernetes
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          Type=notify
+          ExecStartPre=-/sbin/modprobe br_netfilter
+          ExecStartPre=-/sbin/modprobe overlay
+          ExecStart=/opt/bin/k3s server \
+            --server https://{{ vip_ip }}:6443 \
+            --token {{ k3s_token }} \
+            --tls-san {{ vip_ip }} \
+            --node-name {{ inventory_hostname }} \
+            --node-ip {{ ansible_host }}
+          Restart=always
+          KillMode=process
+          Delegate=yes
+          LimitNOFILE=1048576
+          LimitNPROC=infinity
+          LimitCORE=infinity
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Recargar systemd y reiniciar K3s con nueva configuración
+      ansible.builtin.systemd:
+        name: k3s
+        daemon_reload: true
+        enabled: true
+        state: restarted
